@@ -1,31 +1,31 @@
 package main
 
 import (
-	"flag"
-	"fmt"
-	"os"
-	"log"
-	"os/signal"
-	"syscall"
 	"PortAMP/blob"
 	"PortAMP/decoder"
+	"flag"
+	"fmt"
+	"log"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 )
 
-const PORTAMP_VERSION = "0.0.1";
+const PORTAMP_VERSION = "0.0.1"
 
 var (
-	debug bool
+	debug      bool
 	enableTest bool
 )
 
 func init() {
-	flag.StringVar(&cfg.m_OutputFile, `output-file`, "", `Config file`)
-	flag.BoolVar(&cfg.m_Loop, `loop`, false, `Loop`)
-	flag.BoolVar(&cfg.m_Verbose, `verbose`, false, `verbose`)
+	flag.StringVar(&cfg.m_ConfigFile, `config`, "", `Config file`)
+	flag.BoolVar(&cfg.Loop, `loop`, false, `Loop`)
+	flag.BoolVar(&cfg.Verbose, `verbose`, false, `verbose`)
 	flag.Var(&playlist.FileNames, "list", "List files.")
-	flag.BoolVar(&debug, "debug", false,"Debug")
-	flag.BoolVar(&enableTest, "test", false,"Run with test file")
+	flag.BoolVar(&debug, "debug", false, "Debug")
+	flag.BoolVar(&enableTest, "test", false, "Run with test file")
 
 	flag.Parse()
 }
@@ -33,19 +33,22 @@ func init() {
 func main() {
 	if len(os.Args) < 2 {
 		PrintBanner()
-		if !enableTest{
+		if !enableTest {
 			return
 		}
 	}
-	if err := cfg.ReadConfig(); err != nil{
+	if err := cfg.ReadConfig(); err != nil {
 		log.Fatal(err)
 	}
+	if len(cfg.Files) > 0 {
+		playlist.FileNames = append(playlist.FileNames, cfg.Files...)
+	}
+
 	if enableTest {
 		if playlist.IsEmpty() {
-			playlist.EnqueueTrack( "birds.wav" )
-			playlist.EnqueueTrack( "D:/Музыка/100 Krasiveishih Pesen 2015/01. Gary Moore - Still Got The Blues.mp3" )
+			playlist.EnqueueTrack("birds.wav")
 		}
-		cfg.m_Verbose = true
+		cfg.Verbose = true
 	}
 
 	audio, err := NewAudioSystem()
@@ -57,10 +60,9 @@ func main() {
 
 	Source := audio.CreateAudioSource()
 	defer Source.Close()
-	if ( playlist.GetNumTracks() == 1 ) {
-		Source.SetLooping( cfg.m_Loop )
+	if playlist.GetNumTracks() == 1 {
+		Source.SetLooping(cfg.Loop)
 	}
-
 
 	key_press_chan := make(chan int, 1)
 	exit_chan := make(chan struct{}, 1)
@@ -72,9 +74,9 @@ func main() {
 	//Запускаем прогрыватель
 	RequestingExit := false
 	for !playlist.IsEmpty() && !RequestingExit {
-		file := playlist.GetAndPopNextTrack(cfg.m_Loop)
+		file := playlist.GetAndPopNextTrack(cfg.Loop)
 		DataBlob, err := blob.ReadFile(file)
-		if err != nil || DataBlob.GetDataSize()==0 {
+		if err != nil || DataBlob.GetDataSize() == 0 {
 			log.Println(err)
 			continue
 		}
@@ -83,7 +85,7 @@ func main() {
 			log.Println(err)
 			continue
 		}
-		if err = Source.BindDataProvider( Provider ); err != nil {
+		if err = Source.BindDataProvider(Provider); err != nil {
 			log.Println(err)
 			continue
 		}
@@ -106,7 +108,7 @@ func main() {
 				RequestingExit = true
 				bContinue = false
 			case <-time.After(time.Millisecond * 100):
-				if !Source.IsPlaying(){
+				if !Source.IsPlaying() {
 					log.Println("is not play")
 					bContinue = false
 				}
@@ -129,10 +131,9 @@ func handleSignal(stop_play chan struct{}) {
 }
 
 func PrintBanner() {
-	fmt.Printf( "PortAMP version %s\n", PORTAMP_VERSION)
-	fmt.Printf( "Copyright (C) 2018-2018 Burlakov Alexander\n" );
-	fmt.Printf( "\n" );
-	fmt.Printf( "portamp <filename1> [<filename2> ...] [--loop] [--wav-modplug] [--verbose]\n" );
-	fmt.Printf( "\n" );
+	fmt.Printf("PortAMP version %s\n", PORTAMP_VERSION)
+	fmt.Printf("Copyright (C) 2018-2018 Burlakov Alexander\n")
+	fmt.Printf("\n")
+	fmt.Printf("portamp <filename1> [<filename2> ...] [--loop] [--wav-modplug] [--verbose]\n")
+	fmt.Printf("\n")
 }
-

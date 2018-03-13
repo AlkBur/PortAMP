@@ -4,10 +4,11 @@ import (
 	"PortAMP/blob"
 	"errors"
 	"github.com/hajimehoshi/go-mp3"
+	"io"
 	"log"
 )
 
-var(
+var (
 	errorFormat = errors.New("Error mp3 format")
 )
 
@@ -15,7 +16,7 @@ type Data struct {
 	buf []byte
 
 	decoder *mp3.Decoder
-	offset int
+	offset  int
 }
 
 func New(data *blob.Data, isVerbose bool) (*Data, error) {
@@ -27,43 +28,43 @@ func New(data *blob.Data, isVerbose bool) (*Data, error) {
 	return this, nil
 }
 
-func (d *Data)IsStreaming() bool {
+func (d *Data) IsStreaming() bool {
 	return true
 }
 
-func (this *Data)Seek(offset int) {
+func (this *Data) Seek(offset int) {
 	this.decoder.Seek(int64(offset), 0)
 	this.offset = offset
 }
 
-func (this *Data)NumChannels() int {
+func (this *Data) NumChannels() int {
 	return 2
 }
 
-func (this *Data)SamplesPerSecond() int32 {
+func (this *Data) SamplesPerSecond() int32 {
 	return int32(this.decoder.SampleRate())
 }
 
-func (this *Data)BitsPerSample() int {
+func (this *Data) BitsPerSample() int {
 	return 16
 }
 
-func (this *Data)GetDataSize() int {
+func (this *Data) GetDataSize() int {
 	return int(this.decoder.Length())
 }
 
-func (this *Data)Close() {
+func (this *Data) Close() {
 	this.buf = nil
 	this.decoder.Close()
 }
 
-func (this *Data)StreamData(size int) []byte {
+func (this *Data) StreamData(size int) []byte {
 	if this.IsEndOfStream() {
 		return nil
 	}
 	OldSize := len(this.buf)
 
-	if ( size != OldSize ) {
+	if size != OldSize {
 		this.buf = make([]byte, size)
 	}
 
@@ -71,8 +72,12 @@ func (this *Data)StreamData(size int) []byte {
 	for BytesRead < size {
 		i, err := this.decoder.Read(this.buf[BytesRead:])
 		if err != nil {
-			log.Printf("Read error: %v\n", err)
-		}else if i <= 0 {
+			if err == io.EOF {
+				break
+			} else {
+				log.Printf("Read error: %v\n", err)
+			}
+		} else if i <= 0 {
 			break
 		}
 		BytesRead += i
@@ -83,6 +88,6 @@ func (this *Data)StreamData(size int) []byte {
 	return this.buf
 }
 
-func (this *Data)IsEndOfStream() bool {
+func (this *Data) IsEndOfStream() bool {
 	return this.offset >= this.GetDataSize()
 }
